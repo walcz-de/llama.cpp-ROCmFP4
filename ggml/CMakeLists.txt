@@ -205,7 +205,10 @@ option(GGML_CUDA_NO_PEER_COPY               "ggml: do not use peer to peer copie
 option(GGML_CUDA_NO_VMM                     "ggml: do not try to use CUDA VMM"                OFF)
 option(GGML_CUDA_FA                         "ggml: compile ggml FlashAttention CUDA kernels"  ON)
 option(GGML_CUDA_FA_ALL_QUANTS              "ggml: compile all quants for FlashAttention"     OFF)
-set   (GGML_CUDA_FA_QUANTS "q4_0-q4_0;q8_0-q8_0;f16-f16;bf16-bf16" CACHE STRING
+# ROCmFP4-Fork: unsere symmetrischen Paare gehoeren in die Vorgabe. Ohne sie waeren die
+# Typen zwar bekannt, aber mit COMPILED=0 — das Backend liefe, faende keine Instanz und
+# rechnete still ueber die f16-Ruecklage. Genau die Sorte Fehler, die man nicht sieht.
+set   (GGML_CUDA_FA_QUANTS "q4_0-q4_0;q8_0-q8_0;f16-f16;bf16-bf16;q4_0_rocmfp4-q4_0_rocmfp4;q4_0_rocmfp4_fast-q4_0_rocmfp4_fast;q3_0_rocmfpx-q3_0_rocmfpx;q6_0_rocmfpx-q6_0_rocmfpx;q8_0_rocmfpx-q8_0_rocmfpx;turbo3_0-turbo3_0;turbo4_0-turbo4_0" CACHE STRING
                                             "ggml: FlashAttention K-V type combinations to compile, \"all\" or a list such as \"q8_0-q8_0;q8_0-q4_0\"")
 option(GGML_CUDA_GRAPHS                     "ggml: use CUDA graphs (llama.cpp only)"          ${GGML_CUDA_GRAPHS_DEFAULT})
 option(GGML_CUDA_NCCL                       "ggml: use NVIDIA Collective Comm. Library"       ON)
