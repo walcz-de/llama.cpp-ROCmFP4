@@ -472,18 +472,12 @@ static void ggml_cuda_flash_attn_ext_vec(ggml_backend_cuda_context & ctx, ggml_t
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_BF16, GGML_TYPE_BF16)
 #endif // GGML_CUDA_FA_ALL_QUANTS
 
-#ifdef GGML_USE_HIP
-    // HIP fused TurboQuant path. These are kept outside FA_ALL_QUANTS so the
-    // release/default build supports the symmetric and asymmetric KV modes.
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_TURBO3_0, GGML_TYPE_TURBO3_0)
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_TURBO3_0, GGML_TYPE_TURBO4_0)
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_TURBO4_0, GGML_TYPE_TURBO3_0)
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_TURBO4_0, GGML_TYPE_TURBO4_0)
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_Q8_0,     GGML_TYPE_TURBO3_0)
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_Q8_0,     GGML_TYPE_TURBO4_0)
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_TURBO3_0, GGML_TYPE_Q8_0)
-    FATTN_VEC_CASES_TURBO(GGML_TYPE_TURBO4_0, GGML_TYPE_Q8_0)
-#endif // GGML_USE_HIP
+// NOTE: the source fork also dispatches FlashAttention for the TurboQuant KV types
+// (105/106), including mixed K/V pairs such as TURBO4/TURBO3. Those combinations
+// have no template instances in template-instances/, so enabling them here fails to
+// link. This backend serves ROCmFP4 *weights*; TurboQuant KV-cache is out of scope
+// and LocalAI already ships a dedicated turboquant backend for it. The types stay
+// declared so the ggml type IDs keep matching published GGUFs.
 
     GGML_ABORT("fatal error");
 }
