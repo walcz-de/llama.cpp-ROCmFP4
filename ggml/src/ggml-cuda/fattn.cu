@@ -418,11 +418,6 @@ static void ggml_cuda_flash_attn_ext_mma_f16(ggml_backend_cuda_context & ctx, gg
     FATTN_VEC_CASE(128, type_K_case, type_V_case)       \
     FATTN_VEC_CASE(256, type_K_case, type_V_case)       \
 
-// TurboQuant kennt keine Kopfgroesse 64 — deshalb ein eigener Aufruf ohne D=64.
-#define FATTN_VEC_CASES_TURBO(type_K, type_V) \
-    FATTN_VEC_CASE(128, type_K, type_V)       \
-    FATTN_VEC_CASE(256, type_K, type_V)       \
-
 typedef void (* fattn_vec_case_t)(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
 
 // Vector kernel for the given head size and K/V types, nullptr if its template instance was not compiled:
@@ -438,15 +433,12 @@ static fattn_vec_case_t ggml_cuda_get_fattn_vec_case(const int64_t head_size, co
     FATTN_VEC_CASES_ALL_D(Q6_0_ROCMFPX,      Q6_0_ROCMFPX)
     FATTN_VEC_CASES_ALL_D(Q8_0_ROCMFPX,      Q8_0_ROCMFPX)
 
-    // TurboQuant: D=64 gibt es hier nicht, deshalb der eigene Makro-Aufruf.
-    FATTN_VEC_CASES_TURBO(TURBO3_0, TURBO3_0)
-    FATTN_VEC_CASES_TURBO(TURBO4_0, TURBO4_0)
-    FATTN_VEC_CASES_TURBO(TURBO3_0, TURBO4_0)
-    FATTN_VEC_CASES_TURBO(TURBO4_0, TURBO3_0)
-    FATTN_VEC_CASES_TURBO(TURBO3_0, Q8_0)
-    FATTN_VEC_CASES_TURBO(TURBO4_0, Q8_0)
-    FATTN_VEC_CASES_TURBO(Q8_0, TURBO3_0)
-    FATTN_VEC_CASES_TURBO(Q8_0, TURBO4_0)
+    // KEIN FlashAttention-Dispatch fuer die TurboQuant-KV-Typen (105/106). Instanzen gibt es
+    // nur fuer die beiden symmetrischen Paare; unter der alten Struktur brach das den Link
+    // (ld.lld: undefined symbol ggml_cuda_flash_attn_ext_vec_case<128, 106, 105>). Upstreams
+    // `if constexpr` wuerde das heute abfangen — die Entscheidung bleibt trotzdem: dieses
+    // Backend bedient ROCmFP4-GEWICHTE, TurboQuant-KV ist Sache des turboquant-Backends.
+    // Die TYPEN bleiben deklariert, damit die ggml-Typnummern zu veroeffentlichten GGUFs passen.
     FATTN_VEC_CASES_ALL_D(Q4_0, F16)
     FATTN_VEC_CASES_ALL_D(Q4_1, F16)
     FATTN_VEC_CASES_ALL_D(Q5_0, F16)
@@ -555,8 +547,6 @@ static bool ggml_cuda_fattn_kv_type_supported(const ggml_type type) {
         case GGML_TYPE_Q3_0_ROCMFPX:
         case GGML_TYPE_Q6_0_ROCMFPX:
         case GGML_TYPE_Q8_0_ROCMFPX:
-        case GGML_TYPE_TURBO3_0:
-        case GGML_TYPE_TURBO4_0:
             return true;
         default:
             return false;
