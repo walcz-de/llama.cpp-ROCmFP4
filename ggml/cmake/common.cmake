@@ -51,7 +51,19 @@ endfunction()
 
 # Determines which FlashAttention vector kernel template instances to compile, returns them in OUT_SRCS.
 function(ggml_cuda_fattn_vec_instances DIR OUT_SRCS)
-    set(FA_TYPES q4_0 q4_1 q5_0 q5_1 q8_0 bf16 f16)
+    # ROCmFP4-Fork: unsere Typen gehoeren in DIESE Liste, nicht in einen eigenen Block —
+    # aus ihr erzeugt die Schleife unten die GGML_CUDA_FA_<K>_<V>-Makros, die
+    # FATTN_VEC_CASE in fattn.cu abfragt. Fehlt ein Typ hier, ist sein `if constexpr`
+    # kein `false`, sondern ein Uebersetzungsfehler.
+    #
+    # ACHTUNG: GGML_CUDA_FA_QUANTS="all" ist auf diesem Fork NICHT benutzbar. "all" bildet
+    # das Kreuzprodukt (14 x 14 = 196) und verlangt zu JEDER Kombination eine Instanzdatei;
+    # unsere Typen haben nur symmetrische Instanzen. Der Lauf bricht dann mit einer
+    # eindeutigen Meldung ab, die die fehlende Datei nennt — das ist gewollt und ehrlicher,
+    # als still das Falsche zu bauen.
+    set(FA_TYPES q4_0 q4_1 q5_0 q5_1 q8_0 bf16 f16
+                 q4_0_rocmfp4 q4_0_rocmfp4_fast q3_0_rocmfpx q6_0_rocmfpx q8_0_rocmfpx
+                 turbo3_0 turbo4_0)
 
     string(TOLOWER "${GGML_CUDA_FA_QUANTS}" FA_QUANTS)
     string(STRIP   "${FA_QUANTS}" FA_QUANTS)
