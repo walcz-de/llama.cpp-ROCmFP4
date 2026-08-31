@@ -1,5 +1,6 @@
 #define GGML_COMMON_IMPL_C
 #include "ggml-common.h"
+#include "../rocmfp4/rocmfp4.h" // block_rocmfp4 / block_rocmfp4_fast for row validation
 
 #include "ggml-quants.h"
 #include "ggml-impl.h"
@@ -5648,6 +5649,33 @@ bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbyte
         case GGML_TYPE_IQ4_NL:
             {
                 VALIDATE_ROW_DATA_D_F16_IMPL(block_iq4_nl, data, nb);
+            } break;
+
+        case GGML_TYPE_Q4_0_ROCMFP4:
+            {
+                // The 4-bit codes have no invalid encodings — every nibble maps to a
+                // value. The UE4M3 scale does: rocmfp4_ue4m3_to_fp32_half() only has a
+                // table for 0x00..0x7e and returns 0.0f above that, which would zero the
+                // block instead of failing. So that is exactly what is worth checking.
+                const block_rocmfp4 * q = (const block_rocmfp4 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (q[i].e[0] > 0x7e || q[i].e[1] > 0x7e) {
+                        fprintf(stderr, "%s: found out-of-range UE4M3 scale (0x%02x/0x%02x) at block %zu\n",
+                                __func__, q[i].e[0], q[i].e[1], i);
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_Q4_0_ROCMFP4_FAST:
+            {
+                const block_rocmfp4_fast * q = (const block_rocmfp4_fast *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (q[i].e > 0x7e) {
+                        fprintf(stderr, "%s: found out-of-range UE4M3 scale (0x%02x) at block %zu\n",
+                                __func__, q[i].e, i);
+                        return false;
+                    }
+                }
             } break;
 
         case GGML_TYPE_I8:
