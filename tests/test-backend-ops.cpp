@@ -10715,6 +10715,18 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
     test_cases.emplace_back(new test_mul_mat_id_w4a8(GGML_TYPE_MXFP4, GGML_TYPE_F32, 8, 2, false, 32, 32, 256));
     test_cases.emplace_back(new test_mul_mat_id_w4a4(GGML_TYPE_MXFP4, GGML_TYPE_F32, 8, 2, false, 32, 32, 256));
 
+    // rocmfp4 fork: the dual-scale type carries one scale per 16 values. MMVQ (n <= 8) and MMQ (n > 8)
+    // read those scales through different code, and MMQ once used the 32-value Q8_0 vec_dot for it (wrong
+    // scales, NMSE ~0.04). Cover both sides of the MMVQ/MMQ switch, several K-tiles (k = 1024), a row count
+    // that is not a tile multiple (m = 129, bounds-checked loader) and the MoE path.
+    for (ggml_type type_a : {GGML_TYPE_Q4_0_ROCMFP4, GGML_TYPE_Q4_0_ROCMFP4_FAST}) {
+        for (int n : {1, 8, 9, 16, 64, 128, 512}) {
+            test_cases.emplace_back(new test_mul_mat(type_a, GGML_TYPE_F32, 129, n, 1024, {1, 1}, {1, 1}));
+        }
+        test_cases.emplace_back(new test_mul_mat_id(type_a, GGML_TYPE_F32, 8, 2, false, 128, 64, 512));
+        test_cases.emplace_back(new test_mul_mat_id(type_a, GGML_TYPE_F32, 8, 2, true,  129, 512, 1024));
+    }
+
 #if 0
     // > 4GB A matrix. Too slow to be enabled by default.
     test_cases.emplace_back(new test_mul_mat(GGML_TYPE_F16, GGML_TYPE_F16,  900000,  3, 2592, {1, 1}, {1, 1}));
