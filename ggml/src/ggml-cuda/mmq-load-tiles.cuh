@@ -1615,9 +1615,13 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 // mirrors the MXFP4 loader; only the 4-bit value table (Codebook10 instead of
 // E2M1) and the scale encoding (finite UE4M3 instead of E8M0) differ.
 // ROCmFP4 (dual-scale, 4.50 bpw). Same 32-value / QI=4 geometry as MXFP4, but each
-// block carries two finite-UE4M3 half-block scales instead of one E8M0. That is why
-// it uses the Q3_K SRAM layout: its MMQ_TILE_NE_K/2 floats of scale space hold
-// exactly 8 blocks x 2 scales per tile row.
+// block carries two finite-UE4M3 half-block scales instead of one E8M0: e[0] scales
+// values 0..15 (low nibbles, ints 0..3 of the block in x_qs), e[1] values 16..31
+// (high nibbles, ints 4..7). One scale per 16 values is the Q8_0_16 tile layout, the
+// same as NVFP4 and Q3_K: MMA uses the Q3_K SRAM layout (MMQ_TILE_NE_K/2 floats =
+// 8 blocks x 2 scales per tile row), DP4A uses MMQ_DP4A_TXS_Q8_0_16, and both must be
+// paired with the 16-value vec_dot (ggml_cuda_mmq_vec_dot_q8_0_16_q8_1_*). The 32-value
+// Q8_0 vec_dot reads one scale per 8 ints and therefore picks the wrong scales.
 template <ggml_type type, int J, bool fallback> static __device__ __forceinline__ void ggml_cuda_mmq_load_tiles_rocmfp4(
         const char * __restrict__ x, int * __restrict__ x_tile, const int kbx0, const int i_max, const int stride) {
     constexpr int warp_size   = ggml_cuda_get_physical_warp_size();
@@ -1681,8 +1685,8 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
         x_df[i*sram_stride + 2*kbxd + 0] = rocmfp4_ue4m3_to_fp32_half_finite(bxi->e[0]);
         x_df[i*sram_stride + 2*kbxd + 1] = rocmfp4_ue4m3_to_fp32_half_finite(bxi->e[1]);
 #else
-        x_df[i*(MMQ_TILE_NE_K/2) + i/QI_ROCMFP4 + 2*kbxd + 0] = rocmfp4_ue4m3_to_fp32_half_finite(bxi->e[0]);
-        x_df[i*(MMQ_TILE_NE_K/2) + i/QI_ROCMFP4 + 2*kbxd + 1] = rocmfp4_ue4m3_to_fp32_half_finite(bxi->e[1]);
+        x_df[i*(2*MMQ_TILE_NE_K*2/QI8_0) + i/(QI8_0/4) + 2*kbxd + 0] = rocmfp4_ue4m3_to_fp32_half_finite(bxi->e[0]);
+        x_df[i*(2*MMQ_TILE_NE_K*2/QI8_0) + i/(QI8_0/4) + 2*kbxd + 1] = rocmfp4_ue4m3_to_fp32_half_finite(bxi->e[1]);
 #endif // defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
     }
 }
