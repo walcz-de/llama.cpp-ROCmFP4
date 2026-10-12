@@ -71,10 +71,10 @@ static void ggml_cuda_mul_mat_q_switch_type(ggml_backend_cuda_context & ctx, con
             break;
 // -----------------------------------------------------------------------
         case GGML_TYPE_Q4_0_ROCMFP4:
-            mul_mat_q_case<GGML_TYPE_Q4_0_ROCMFP4>(ctx, args, stream);
+            mul_mat_q_case<GGML_TYPE_Q4_0_ROCMFP4, GGML_PREC_Q8>(ctx, args, stream);
             break;
         case GGML_TYPE_Q4_0_ROCMFP4_FAST:
-            mul_mat_q_case<GGML_TYPE_Q4_0_ROCMFP4_FAST>(ctx, args, stream);
+            mul_mat_q_case<GGML_TYPE_Q4_0_ROCMFP4_FAST, GGML_PREC_Q8>(ctx, args, stream);
             break;
         case GGML_TYPE_MXFP4:
             // src1 at Q4 uses the native FP4 instructions, which are Blackwell-only
